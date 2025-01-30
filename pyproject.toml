@@ -1,0 +1,18 @@
+[project]
+name = "all-isbns"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "bencode-py>=4.0.0",
+    "numpy>=2.2.2",
+    "pillow>=11.1.0",
+    "tqdm>=4.67.1",
+    "zstandard>=0.23.0",
+]
+
+[dependency-groups]
+dev = [
+    "rich>=13.9.4",
+]

@@ -1,0 +1,16 @@
+_app
+_generated
+_misc
+_scripts
+
+intermediate_
+web_
+
+intermediate
+web/data
+
+.venv
+.vscode
+.DS_Store
+
+__pycache__
