@@ -57,7 +57,7 @@ def save_block(path: Path, id: int, block: Image.Image):
 
                 pbar.update(1)
 
-def process_data(input_path: Path, output_path: Path) -> None:
+def process_data(input_path: Path, output_path: Path, small: bool) -> None:
     print(f"### Processing {input_path}")
 
     isbn_data = bencodepy.bread(zstandard.ZstdDecompressor().stream_reader(open(input_path, 'rb')))
@@ -79,9 +79,8 @@ def process_data(input_path: Path, output_path: Path) -> None:
         if set_name == 'md5':
             continue
 
-        # to dev more quickly, early break
-        # if set_name == 'edsebk':
-        #     break
+        if small and set_name == 'edsebk':
+            break
 
         print(f"### Processing {set_name}")
         for id, block in processor.process(packed_isbns_binary):
@@ -109,9 +108,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('input', type=Path, help='Input file path')
     parser.add_argument('output', type=Path, help='Output path')
+    parser.add_argument("--small", action="store_true", help="For dev purposes, don't render all tiles")
     args = parser.parse_args()
 
-    process_data(args.input, args.output)
+    process_data(args.input, args.output, args.small)
 
 if __name__ == '__main__':
     main()

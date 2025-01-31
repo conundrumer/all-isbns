@@ -20,6 +20,9 @@ def process_data(input_path: Path, output_path: Path) -> None:
         root = ET.fromstring(xml_content)
 
         for group in root.findall('.//Group'):
+            if all(int(rule.find('Length').text) == 0 for rule in group.findall('.//Rule')):
+                continue
+
             prefix = normalize_isbn(group.find('Prefix').text)
             agency = group.find('Agency').text
 

@@ -4,7 +4,7 @@
 2. If you're not using uv, edit the first line in the Makefile `PYTHON := uv run` to your choice of Python
 3. Add data files to the `data` dir, see the Makefile
 4. Run `make`. May take 1-2 hours to complete if using full sized worldcat dataset. You can build each target separately and exit early to speed things up.
-5. Run an http server in `web` like `python -m http.server`
+5. Run an http server in `web` like `python -m http.server` or `npx reload`
 
 # other notes
 

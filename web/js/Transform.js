@@ -60,25 +60,25 @@ export function doubleAnchorTransform(p0, q0, p1, q1, minScale, maxScale) {
 /**
  * Convert screen coordinates to content coordinates
  * @param {[number, number]} screenPoint Point in screen space
- * @param {{ x: number, y: number, scale: number }} transform Current transform
+ * @param {{ x: number, y: number, scale: number, width: number, height: number }} transform Current transform
  * @returns {[number, number]} Point in content space
  */
-export function screenToContent([px, py], { x, y, scale }) {
+export function screenToContent([px, py], { x, y, scale, width, height }) {
   return [
-    (px - x) / scale,
-    (py - y) / scale
+    (px - x - width / 2) / scale,
+    (py - y - height / 2) / scale
   ];
 }
 
 /**
  * Convert content coordinates to screen coordinates
  * @param {[number, number]} contentPoint Point in content space
- * @param {{ x: number, y: number, scale: number }} transform Current transform
+ * @param {{ x: number, y: number, scale: number, width: number, height: number }} transform Current transform
  * @returns {[number, number]} Point in screen space
  */
-export function contentToScreen([px, py], { x, y, scale }) {
+export function contentToScreen([px, py], { x, y, scale, width, height }) {
   return [
-    px * scale + x,
-    py * scale + y
+    px * scale + x + width / 2,
+    py * scale + y + height / 2
   ];
 }

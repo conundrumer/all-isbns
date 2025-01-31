@@ -93,10 +93,6 @@ class PointerInputHandler {
    * @private
    */
   _init() {
-    Object.assign(this._container.style, {
-      touchAction: 'none'
-    });
-
     this._container.addEventListener('pointerdown', this._handlePointerDown);
     this._container.addEventListener('pointermove', this._handlePointerMove);
     this._container.addEventListener('wheel', this._handleWheel, { passive: false });

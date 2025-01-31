@@ -1,5 +1,18 @@
+import ViewportResizeObserver from "./ViewportResizeObserver.js";
 import PointerInputHandler from './PointerInputHandler.js';
 import { singleAnchorTransform, doubleAnchorTransform, screenToContent, contentToScreen } from './Transform.js';
+
+/**
+ * @typedef {Object} ViewportState
+ * @property {number} x
+ * @property {number} y
+ * @property {number} scale
+ * @property {number | null} cursorX
+ * @property {number | null} cursorY
+ * @property {number} width
+ * @property {number} height
+ * @property {number} pixelRatio
+ */
 
 class ViewportController {
   /** @type {HTMLElement} */
@@ -8,11 +21,11 @@ class ViewportController {
   /** @type {import('./PointerInputHandler.js').default} */
   _pointerHandler;
 
-  /** @type {{ x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }} */
-  _state = { x: 0, y: 0, scale: 1, cursorX: null, cursorY: null };
+  /** @type {ViewportState} */
+  state = { x: 0, y: 0, scale: 1, cursorX: null, cursorY: null, width: 0, height: 0, pixelRatio: 1};
 
   /** @type {{
-    onChange?: (state: { x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }) => void,
+    onChange?: (state: ViewportState) => void,
     onClick?: (x: number, y: number) => void,
     minScale?: number,
     maxScale?: number,
@@ -34,8 +47,8 @@ class ViewportController {
    * Create viewport controller
    * @param {HTMLElement} container - Container element for viewport
    * @param {{
-   *   onChange?: (state: { x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }) => void,
-   *   onClick?: (x: number, y: number) => void,
+   *   onChange?: (state: ViewportState) => void,
+   *   onClick?: (screenX: number, screenX: number) => void,
    *   minScale?: number,
    *   maxScale?: number,
    *   wheelZoomSpeed?: number
@@ -59,24 +72,33 @@ class ViewportController {
       onPointerHover: this._handlePointerHover,
       onWheel: this._handleWheel
     });
+
+    const viewportResizeObserver = new ViewportResizeObserver(
+      container,
+      (state) => {
+        this._setState(state);
+      }
+    );
+
+    this.state = {...this.state, ...viewportResizeObserver.state};
   }
 
   /**
-   * @param {Partial<{ x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }>} newState
+   * @param {Partial<ViewportState>} newState
    * @private
    */
   _setState(newState) {
     const scale = newState.scale !== undefined ?
       Math.min(Math.max(newState.scale, this._options.minScale), this._options.maxScale) :
-      this._state.scale;
+      this.state.scale;
 
-    this._state = {
-      ...this._state,
+    this.state = {
+      ...this.state,
       ...newState,
       scale
     };
 
-    this._options.onChange(this._state);
+    this._options.onChange(this.state);
   }
 
   /**
@@ -85,10 +107,9 @@ class ViewportController {
    * @private
    */
   _handlePointerHover = (data) => {
-    const [contentX, contentY] = screenToContent([data.x, data.y], this._state);
     this._setState({
-      cursorX: contentX,
-      cursorY: contentY
+      cursorX: data.x,
+      cursorY: data.y
     });
   }
 
@@ -104,7 +125,7 @@ class ViewportController {
    */
   _handlePointerDown = (data) => {
     const screenPoint = [data.x, data.y];
-    const contentPoint = screenToContent(screenPoint, this._state);
+    const contentPoint = screenToContent(screenPoint, this.state);
 
     if (this._activePointers.length === 0) {
       this._pointerMoved = false
@@ -125,11 +146,11 @@ class ViewportController {
 
       p.screenPoint = [p.id === data.pointerId ? data.x : p.screenPoint[0],
                       p.id === data.pointerId ? data.y : p.screenPoint[1]];
-      p.contentPoint = screenToContent(p.screenPoint, this._state);
+      p.contentPoint = screenToContent(p.screenPoint, this.state);
 
       q.screenPoint = [q.id === data.pointerId ? data.x : q.screenPoint[0],
                       q.id === data.pointerId ? data.y : q.screenPoint[1]];
-      q.contentPoint = screenToContent(q.screenPoint, this._state);
+      q.contentPoint = screenToContent(q.screenPoint, this.state);
     }
   }
 
@@ -144,7 +165,7 @@ class ViewportController {
     if (this._activePointers.length === 2) {
       const remainingPointer = this._activePointers.find(p => p.id !== data.pointerId);
       if (remainingPointer) {
-        remainingPointer.contentPoint = screenToContent(remainingPointer.screenPoint, this._state);
+        remainingPointer.contentPoint = screenToContent(remainingPointer.screenPoint, this.state);
       }
     }
 
@@ -171,10 +192,9 @@ class ViewportController {
     const newScreenPoint = [data.x, data.y];
     // Only update cursor position for mouse input during drag
     if (data.pointerType === 'mouse') {
-      const [contentX, contentY] = screenToContent(newScreenPoint, this._state);
       this._setState({
-        cursorX: contentX,
-        cursorY: contentY
+        cursorX: data.x,
+        cursorY: data.y
       });
     }
 
@@ -186,8 +206,8 @@ class ViewportController {
       );
 
       this._setState({
-        x: this._state.x + dx,
-        y: this._state.y + dy
+        x: this.state.x + dx,
+        y: this.state.y + dy
       });
     }
     else if (this._activePointers.length === 2) {
@@ -226,36 +246,35 @@ class ViewportController {
     if (data.trackpad && !data.pinch) {
       // Pan for trackpad scroll
       const nextState = {
-        x: this._state.x - data.deltaX,
-        y: this._state.y - data.deltaY
+        x: this.state.x - data.deltaX,
+        y: this.state.y - data.deltaY
       }
-      const [contentX, contentY] = screenToContent([data.x, data.y], {...this._state, ...nextState});
       this._setState({
         ...nextState,
-        cursorX: contentX,
-        cursorY: contentY
+        cursorX: data.x,
+        cursorY: data.y
       });
     } else {
       // Zoom for mouse wheel or trackpad pinch
-      const contentPoint = screenToContent([data.x, data.y], this._state);
+      const contentPoint = screenToContent([data.x, data.y], this.state);
       const scaleFactor = Math.exp(-data.deltaY * this._options.wheelZoomSpeed);
       const newScale = Math.min(Math.max(
-        this._state.scale * scaleFactor,
+        this.state.scale * scaleFactor,
         this._options.minScale
       ), this._options.maxScale);
 
       // Only adjust position if scale actually changed
-      if (newScale !== this._state.scale) {
+      if (newScale !== this.state.scale) {
         // Calculate new position to zoom around cursor point
         const newScreenPoint = contentToScreen(contentPoint, {
-          ...this._state,
+          ...this.state,
           scale: newScale
         });
 
         this._setState({
           scale: newScale,
-          x: this._state.x + (data.x - newScreenPoint[0]),
-          y: this._state.y + (data.y - newScreenPoint[1])
+          x: this.state.x + (data.x - newScreenPoint[0]),
+          y: this.state.y + (data.y - newScreenPoint[1])
         });
       }
     }
@@ -263,15 +282,15 @@ class ViewportController {
 
   /**
    * Get current viewport transform including cursor position
-   * @returns {{ x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }}
+   * @returns {ViewportState}
    */
   getTransform() {
-    return { ...this._state };
+    return { ...this.state };
   }
 
   /**
    * Set viewport transform
-   * @param {Partial<{ x: number, y: number, scale: number, cursorX: number | null, cursorY: number | null }>} newState
+   * @param {Partial<ViewportState>} newState
    */
   setTransform(newState) {
     this._setState(newState);

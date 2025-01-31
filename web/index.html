@@ -3,39 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Pannable & Zoomable Canvas</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background: black;
-        }
-        #container {
-            width: 100vw;
-            height: 100vh;
-            position: relative;
-            overflow: hidden;
-        }
-        #canvas {
-            position: absolute;
-            transform-origin: 0 0;
-            /* background: black; */
-
-            -webkit-user-select: none;
-            -khtml-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
-            touch-action: none;
-        }
-    </style>
+    <title>All ISBNs</title>
+    <link rel="stylesheet" href="styles.css">
+    <preload href="data/manifest.json" as="fetch" type="application/json" crossorigin="anonymous"></preload>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.5/dist/cdn.js"></script>
 </head>
 <body>
     <div id="container">
         <canvas id="canvas"></canvas>
     </div>
+    <div id="layers-ui" x-data="{
+        nextId: 0,
+        layers: [],
+        datasets: ['all', 'md5', 'years', 'holdings'],
+        init() {
+            this.addLayer();
+        },
+        addLayer() {
+            this.layers.push({
+                id: this.nextId,
+                visible: true,
+                color: ['#00ff00', '#0000ff', '#ff0000'][this.nextId % 3],
+                dataset: 'all',
+                mode: 'all',
+                cutoff: 255,
+                lowerCutoff: 0
+            });
+            this.nextId++;
+        }
+    }">
+        <template x-for="(layer, i) in layers" :key="layer.id">
+            <div class="layer-group" :style="`border-color: ${layer.color}`">
+                <div class="row">
+                    <button @click="layer.visible = !layer.visible" class="icon-button">
+                        <template x-if="layer.visible">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                <circle cx="12" cy="12" r="3"/>
+                            </svg>
+                        </template>
+                        <template x-if="!layer.visible">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                                <line x1="1" y1="1" x2="23" y2="23"/>
+                            </svg>
+                        </template>
+                    </button>
 
-    <script type="module" src="./main.js">
-    </script>
+                    <select x-model="layers[i].dataset">
+                        <template x-for="set in datasets" :key="set">
+                            <option x-text="set"></option>
+                        </template>
+                    </select>
+
+                    <div class="color-group">
+                        <button class="color-preset" @click="layer.color = '#ff0000'" style="background-color: #ff0000"></button>
+                        <button class="color-preset" @click="layer.color = '#00ff00'" style="background-color: #00ff00"></button>
+                        <button class="color-preset" @click="layer.color = '#0000ff'" style="background-color: #0000ff"></button>
+                        <input class="color-picker" type="color" x-model="layers[i].color" class="color-picker">
+                    </div>
+
+                </div>
+
+
+                <div class="radio-group" x-show="layer.dataset !== 'md5'">
+                    <label>
+                        <input type="radio" x-model="layers[i].mode" :name="'color-' + layer.id" value="all">
+                        all
+                    </label>
+                    <label>
+                        <input type="radio" x-model="layers[i].mode" :name="'color-' + layer.id" value="in">
+                        in md5
+                    </label>
+                    <label>
+                        <input type="radio" x-model="layers[i].mode" :name="'color-' + layer.id" value="out">
+                        not in md5
+                    </label>
+                </div>
+
+                <div class="slider-group" x-show="layer.dataset === 'holdings'">
+                    <span>Max</span>
+                    <input type="range" x-model.number="layers[i].cutoff" min="1" max="255">
+                    <span x-text="layers[i].cutoff === 255 ? 'None' : layers[i].cutoff"></span>
+                </div>
+
+                <div class="slider-group" x-show="layer.dataset === 'years'">
+                    <span>Max</span>
+                    <input type="range" x-model.number="layers[i].cutoff" min="1" max="255">
+                    <span x-text="2025 - 255 + layers[i].cutoff"></span>
+                </div>
+
+                <div class="slider-group" x-show="layer.dataset === 'years'">
+                    <label>
+                        Min:
+                        <input type="range" x-model.number="layers[i].lowerCutoff" min="1" max="255">
+                        <span x-text="layers[i].lowerCutoff === 1 ? 'None' : (2025 - 255 + layers[i].lowerCutoff)"></span>
+                    </label>
+                </div>
+
+                <!-- <button @click="layers = layers.filter(l => l.id !== layer.id)">Remove Layer</button> -->
+            </div>
+        </template>
+        <!-- <button @click="addLayer">Add Layer</button> -->
+        <div class="add-layer-container">
+            <button @click="addLayer" class="icon-button">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 5v14m7-7H5"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <script type="module" src="./js/main.js"></script>
 </body>
 </html>

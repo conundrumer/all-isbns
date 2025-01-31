@@ -17,8 +17,11 @@ def init_plots():
 
 def save_plots(images: list[Image.Image], output_path: Path):
     for i, image in enumerate(images):
+        image.save(output_path / f"{i}.png", optimize=True, compress_level=9)
+
         # for better PNG compression, store in landscape orientation
-        rotated = i % 2 == 1
-        if rotated:
-            image = image.transpose(Image.Transpose.ROTATE_90)
-        image.save(output_path / f"{i}{'r' if rotated else ''}.png")
+        # NVM too much trouble to unrotate in JS land
+        # rotated = i % 2 == 1
+        # if rotated:
+        #     image = image.transpose(Image.Transpose.ROTATE_90)
+        # image.save(output_path / f"{i}{'r' if rotated else ''}.png", optimize=True, compress_level=9)

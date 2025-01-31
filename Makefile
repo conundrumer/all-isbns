@@ -19,6 +19,7 @@ INTERMEDIATE := intermediate
 # Generated web data
 ISBN_AGENCIES := $(OUTPUT)/isbn_agencies.json
 ISBN_PUBLISHERS := $(OUTPUT)/isbn_publishers/.sentinel
+AGENCY_PLOT := $(OUTPUT)/agency_plot.png
 PUBLISHER_PLOTS := $(OUTPUT)/publisher_plots/.sentinel
 ALLOCATION_PLOTS := $(OUTPUT)/allocation_plots/.sentinel
 TILE_SETS := $(OUTPUT)/tile_sets/.sentinel
@@ -41,23 +42,26 @@ setup:
 $(OUTPUT) $(INTERMEDIATE):
 	@mkdir -p $@
 
-$(ISBN_AGENCIES): $(RANGE_MSG) $(SCRIPTS)/common.py $(SCRIPTS)/extract_agencies.py | $(OUTPUT)
+$(ISBN_AGENCIES): $(RANGE_MSG) $(SCRIPTS)/extract_agencies.py | $(OUTPUT)
 	$(PYTHON) $(SCRIPTS)/extract_agencies.py $< $@
 
-$(ISBN_PUBLISHERS): $(ISBNGRP) $(SCRIPTS)/common.py $(SCRIPTS)/extract_publishers.py | $(OUTPUT) $(INTERMEDIATE)
-	@rm -rf $(@D)
+$(ISBN_PUBLISHERS): $(ISBNGRP) $(SCRIPTS)/extract_publishers.py | $(OUTPUT) $(INTERMEDIATE)
+	rm -rf $(@D)
 	@mkdir -p $(@D)
 	$(PYTHON) $(SCRIPTS)/extract_publishers.py $< $(@D) $(PUBLISHER_ISBN_LIST)
 	@touch $@
 
-$(PUBLISHER_PLOTS): $(ISBN_PUBLISHERS) $(SCRIPTS)/common.py $(SCRIPTS)/plot.py $(SCRIPTS)/plot_publishers.py | $(OUTPUT)
-	@rm -rf $(@D)
+$(AGENCY_PLOT): $(ISBN_AGENCIES) $(SCRIPTS)/plot_agencies.py | $(OUTPUT)
+	$(PYTHON) $(SCRIPTS)/plot_agencies.py $< $@
+
+$(PUBLISHER_PLOTS): $(ISBN_PUBLISHERS) $(SCRIPTS)/plot_publishers.py | $(OUTPUT)
+	rm -rf $(@D)
 	@mkdir -p $(@D)
 	$(PYTHON) $(SCRIPTS)/plot_publishers.py $(PUBLISHER_ISBN_LIST) $(@D)
 	@touch $@
 
-$(ALLOCATION_PLOTS): $(RANGE_MSG) $(SCRIPTS)/common.py $(SCRIPTS)/plot.py $(SCRIPTS)/plot_allocations.py | $(OUTPUT)
-	@rm -rf $(@D)
+$(ALLOCATION_PLOTS): $(RANGE_MSG) $(SCRIPTS)/plot_allocations.py | $(OUTPUT)
+	rm -rf $(@D)
 	@mkdir -p $(@D)
 	$(PYTHON) $(SCRIPTS)/plot_allocations.py $< $(@D)
 	@touch $@
@@ -66,14 +70,14 @@ $(ISBN_PROPS_DATA): $(WORLDCAT) $(SCRIPTS)/processor_*.py | $(INTERMEDIATE)
 	$(PYTHON) $(SCRIPTS)/processor_main.py $< $@.tmp
 	@mv $@.tmp $@
 
-$(TILE_SETS): $(ISBN_CODES) $(SCRIPTS)/common.py $(SCRIPTS)/render_tile_sets.py | $(OUTPUT)
-	@rm -rf $(@D)
+$(TILE_SETS): $(ISBN_CODES) $(SCRIPTS)/render_tile_sets.py | $(OUTPUT)
+	rm -rf $(@D)
 	@mkdir -p $(@D)
 	$(PYTHON) $(SCRIPTS)/render_tile_sets.py $< $(@D)
 	@touch $@
 
-$(TILE_PROPS): $(ISBN_PROPS_DATA) $(ISBN_CODES) $(SCRIPTS)/common.py $(SCRIPTS)/render_tile_props.py | $(OUTPUT)
-	@rm -rf $(@D)
+$(TILE_PROPS): $(ISBN_PROPS_DATA) $(ISBN_CODES) $(SCRIPTS)/render_tile_props.py | $(OUTPUT)
+	rm -rf $(@D)
 	@mkdir -p $(@D)
 	$(PYTHON) $(SCRIPTS)/render_tile_props.py $< $(@D) --isbncodes $(ISBN_CODES)
 	@touch $@

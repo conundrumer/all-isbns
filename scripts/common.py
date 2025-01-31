@@ -35,7 +35,7 @@ def get_pos(isbn: str) -> tuple[int, int]:
 
             # adjust from 10x2 to 5x4
             if n == 4:
-                y = 2 * y + x // 50_000
+                y = 2 * y + (x // 50_000) * 10_000
                 x %= 50_000
 
             n -= 1
