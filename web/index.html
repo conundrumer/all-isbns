@@ -13,7 +13,14 @@
         <canvas id="canvas"></canvas>
     </div>
     <div id="layers-ui" x-data="{
+        visible: true,
+        params: {
+            margin: 1,
+            divisionFactor: 1,
+            overlay: true
+        },
         nextId: 0,
+
         layers: [],
         datasets: ['all', 'md5', 'years', 'holdings'],
         init() {
@@ -32,8 +39,32 @@
             this.nextId++;
         }
     }">
+        <div x-show="!visible">
+            <button class="icon-button" @click="visible = true">
+                &gt;
+            </button>
+        </div>
+        <div x-show="visible" class="hide-button">
+            <button class="icon-button" @click="visible = false">
+                &lt;
+            </button>
+        </div>
+        <div class="slider-group" style="margin: 0" x-show="visible">
+            Margin
+            <input type="range" x-model.number="params.margin" min="0" max="2" step="0.01">
+        </div>
+        <div class="slider-group" style="margin: 0" x-show="visible">
+            Division factor
+            <input type="range" x-model.number="params.divisionFactor" min="0" max="2" step="0.01">
+        </div>
+        <div class="checkbox-group" x-show="visible">
+            <label>
+                <input type="checkbox" x-model="params.overlay">
+                Overlay
+            </label>
+        </div>
         <template x-for="(layer, i) in layers" :key="layer.id">
-            <div class="layer-group" :style="`border-color: ${layer.color}`">
+            <div class="layer-group" :style="`border-color: ${layer.color}`" x-show="visible">
                 <div class="row">
                     <button @click="layer.visible = !layer.visible" class="icon-button">
                         <template x-if="layer.visible">
@@ -82,36 +113,38 @@
                 </div>
 
                 <div class="slider-group" x-show="layer.dataset === 'holdings'">
-                    <span>Max</span>
+                    Max
                     <input type="range" x-model.number="layers[i].cutoff" min="1" max="255">
                     <span x-text="layers[i].cutoff === 255 ? 'None' : layers[i].cutoff"></span>
                 </div>
 
                 <div class="slider-group" x-show="layer.dataset === 'years'">
-                    <span>Max</span>
+                    Max
                     <input type="range" x-model.number="layers[i].cutoff" min="1" max="255">
                     <span x-text="2025 - 255 + layers[i].cutoff"></span>
                 </div>
 
                 <div class="slider-group" x-show="layer.dataset === 'years'">
-                    <label>
-                        Min:
-                        <input type="range" x-model.number="layers[i].lowerCutoff" min="1" max="255">
-                        <span x-text="layers[i].lowerCutoff === 1 ? 'None' : (2025 - 255 + layers[i].lowerCutoff)"></span>
-                    </label>
+                    Min
+                    <input type="range" x-model.number="layers[i].lowerCutoff" min="1" max="255">
+                    <span x-text="layers[i].lowerCutoff === 1 ? 'None' : (2025 - 255 + layers[i].lowerCutoff)"></span>
                 </div>
 
                 <!-- <button @click="layers = layers.filter(l => l.id !== layer.id)">Remove Layer</button> -->
             </div>
         </template>
-        <!-- <button @click="addLayer">Add Layer</button> -->
-        <div class="add-layer-container">
+        <div class="add-layer-container" x-show="visible">
             <button @click="addLayer" class="icon-button">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                     <path d="M12 5v14m7-7H5"/>
                 </svg>
             </button>
         </div>
+    </div>
+    <div id="status-ui" x-data="{agency: '', isbn: '', publisher: ''}">
+        <div x-text="isbn"></div>
+        <div x-text="agency"></div>
+        <div class="line-clamp" x-text="publisher" :style="publisher.length > 120 && 'font-size: x-small'"></div>
     </div>
 
     <script type="module" src="./js/main.js"></script>
