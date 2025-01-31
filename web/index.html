@@ -17,7 +17,8 @@
         params: {
             margin: 1,
             divisionFactor: 1,
-            overlay: true
+            overlay: true,
+            autoloadMetadata: false
         },
         nextId: 0,
 
@@ -41,12 +42,12 @@
     }">
         <div x-show="!visible">
             <button class="icon-button" @click="visible = true">
-                &gt;
+                ⋯
             </button>
         </div>
         <div x-show="visible" class="hide-button">
             <button class="icon-button" @click="visible = false">
-                &lt;
+                ✕
             </button>
         </div>
         <div class="slider-group" style="margin: 0" x-show="visible">
@@ -57,11 +58,20 @@
             Division factor
             <input type="range" x-model.number="params.divisionFactor" min="0" max="2" step="0.01">
         </div>
-        <div class="checkbox-group" x-show="visible">
-            <label>
-                <input type="checkbox" x-model="params.overlay">
-                Overlay
-            </label>
+        <div class="row" x-show="visible">
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" x-model="params.overlay">
+                    Overlay
+                </label>
+            </div>
+
+            <div class="checkbox-group">
+                <label>
+                    <input type="checkbox" x-model="params.autoloadMetadata">
+                    Autoload metadata
+                </label>
+            </div>
         </div>
         <template x-for="(layer, i) in layers" :key="layer.id">
             <div class="layer-group" :style="`border-color: ${layer.color}`" x-show="visible">

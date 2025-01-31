@@ -1,6 +1,7 @@
 import ViewportController from "./ViewportController.js";
 
 import { screenToContent, contentToScreen } from "./Transform.js";
+import wrapMonospaceText from "./wrapMonospaceText.js";
 
 /**
  * @typedef {Object} Layer
@@ -20,6 +21,7 @@ const PLOT_WIDTH = 5_000;
 const PLOT_HEIGHT = 40_000;
 const MIN_SCALE = 5e-3;
 const MAX_SCALE = 5e2;
+const CLOSE_UP_TEXT_THRESHOLD = 90;
 
 const COLOR_RANGE_AGENCY = "rgb(3, 8, 7)";
 const COLOR_RANGE_ALLOCATION = "rgb(8, 13, 14)";
@@ -96,6 +98,27 @@ const getClosestScale = (x, scales) =>
     [{ d: 0, s: 0 }, Infinity]
   )[0];
 
+const isbn13CheckDigitFromOffset = (n, full = false) => {
+  if (n.startsWith("0")) {
+    n = "978" + n.slice(1);
+  } else if (n.startsWith("1")) {
+    n = "979" + n.slice(1);
+  }
+
+  const checkDigit =
+    (10 -
+      (n
+        .slice(0, 12)
+        .split("")
+        .reduce((s, d, i) => s + d * (i % 2 ? 3 : 1), 0) %
+        10)) %
+    10;
+
+  if (full) {
+    return n + checkDigit;
+  }
+  return checkDigit;
+};
 // const toBlockCoords = ([x, y]) => {
 //   let bx = Math.max(0, Math.min(4, Math.floor(x / BLOCK_SIZE)));
 //   let by = Math.max(0, Math.min(3, Math.floor(y / BLOCK_SIZE)));
@@ -335,8 +358,15 @@ function main() {
 
   const { store, manifestPromise, agenciesPromise } = setup();
 
+  let previousClickedLocation = store.clickedLocation;
   store.subscribe(() => {
-    draw();
+    let clicked = false;
+    if (store.clickedLocation !== previousClickedLocation) {
+      previousClickedLocation = store.clickedLocation;
+      clicked = true;
+    }
+
+    draw(clicked);
   });
 
   // primary working canvas
@@ -374,7 +404,7 @@ function main() {
     })
   );
   const publisherPlotImages = [];
-  const publisherPlotQueryCanvas = document.createElement("canvas");
+  const readCanvas = document.createElement("canvas");
   function queryPublisherPlots(
     group,
     gx,
@@ -425,15 +455,16 @@ function main() {
     const w = Math.ceil(gw / pw) + 1;
     const h = Math.ceil(gh / ph) + 1;
 
-    const ctx = publisherPlotQueryCanvas.getContext("2d", {
+    const ctx = readCanvas.getContext("2d", {
       alpha: false,
       willReadFrequently: true,
     });
-    if (publisherPlotQueryCanvas.width < w) {
-      publisherPlotQueryCanvas.width = w;
+    ctx.imageSmoothingEnabled = false;
+    if (readCanvas.width < w) {
+      readCanvas.width = w;
     }
-    if (publisherPlotQueryCanvas.height < h) {
-      publisherPlotQueryCanvas.height = h;
+    if (readCanvas.height < h) {
+      readCanvas.height = h;
     }
     ctx.drawImage(image, x, y, w, h, 0, 0, w, h);
     const data = ctx.getImageData(0, 0, w, h).data;
@@ -540,6 +571,30 @@ function main() {
     });
   });
 
+  let olData = new Map();
+  function loadISBNInfo(isbn) {
+    if (olData.has(isbn)) {
+      return olData.get(isbn);
+    }
+
+    olData.set(isbn, null);
+    const isbn13 = isbn13CheckDigitFromOffset(isbn, true);
+
+    return fetch(`https://openlibrary.org/isbn/${isbn13}.json`).then(
+      (response) => {
+        if (!response.ok) {
+          olData.set(isbn, response.status);
+          return;
+        }
+        return response.json().then((data) => {
+          olData.set(isbn, data);
+          scheduleDraw();
+          return data;
+        });
+      }
+    );
+  }
+
   let agencies = {};
   agenciesPromise.then((data) => {
     agencies = data;
@@ -564,7 +619,7 @@ function main() {
     );
     ctx.scale(store.viewport.scale, store.viewport.scale);
   };
-  const draw = () => {
+  const draw = (clicked) => {
     let [vx0, vy0] = screenToContent([0, 0], store.viewport);
     let [vx1, vy1] = screenToContent(
       [store.viewport.width, store.viewport.height],
@@ -665,7 +720,7 @@ function main() {
           t1Ctx.fillRect(0, 0, CONTENT_WIDTH, CONTENT_HEIGHT);
 
           for (const scale of scales) {
-            const should_break = scale.d === closest_scale.d;
+            const shouldBreak = scale.d === closest_scale.d;
             for (const blockCoords of rangeBlockCoords(vx0, vy0, vx1, vy1)) {
               for (const tile of rangeTiles(blockCoords, scale)) {
                 const tile_url = `data/${
@@ -697,7 +752,7 @@ function main() {
                 }
               }
             }
-            if (should_break) {
+            if (shouldBreak) {
               break;
             }
           }
@@ -779,6 +834,7 @@ function main() {
     mCtx.clearRect(0, 0, mainCanvas.width, mainCanvas.height);
     // mCtx.drawImage(canvas, 0, 0);
 
+    let closeUpScale = 0;
     let currAgency;
     let currAgencyPrefix;
     let currPublisherPrefix;
@@ -811,6 +867,10 @@ function main() {
         const x1 = x0 + m0;
         const y1 = y0 + m0;
         const s1 = s0 - m0 * 2;
+
+        if (group === 10) {
+          closeUpScale = Math.max(s1 * scale);
+        }
 
         const [cx, cy] = screenToContent(
           [store.viewport.cursorX, store.viewport.cursorY],
@@ -885,9 +945,9 @@ function main() {
 
         const drawText = (x, y, w, h, text) => {
           const fontSize = 12;
-          const maxLength = (((w * scale) / fontSize) * 1.5) | 0;
-          if (text.length > maxLength) {
-            text = text.slice(0, maxLength) + "…";
+          const maxLength = ((w * scale) / fontSize / 0.6) | 0;
+          if (text.length >= maxLength - 1) {
+            text = text.slice(0, maxLength - 2) + "…";
           }
           mCtx.save();
           mCtx.globalCompositeOperation = "difference";
@@ -898,9 +958,33 @@ function main() {
 
           const x0 = x + m0 + 1 / scale;
           const y0 = y + m0 + 1 / scale;
-          const x1 = x + w - (m0 + 1 / scale);
-          const y1 = y + h - (m0 + 1 / size);
+          // const x1 = x + w - (m0 + 1 / scale);
+          // const y1 = y + h - (m0 + 1 / size);
           mCtx.fillText(text, x0, y0);
+          mCtx.restore();
+        };
+        const drawMultilineText = (x, y, w, h, text) => {
+          const fontSize = 12;
+          const maxWidth = (((w * scale) / fontSize - 1) / 0.6) | 0;
+          const maxLines = ((h * scale) / fontSize / 1.2) | 0;
+          const { lines } = wrapMonospaceText(text, {
+            maxWidth,
+            maxLines,
+            wordWrap: true,
+          });
+
+          const size = fontSize / scale;
+          mCtx.save();
+          mCtx.globalCompositeOperation = "difference";
+          mCtx.font = `${size}px Courier New`;
+          mCtx.textBaseline = "top";
+          mCtx.fillStyle = "white";
+
+          for (let i = 0; i < lines.length; i++) {
+            const x0 = x + m0 + 1 / scale;
+            const y0 = y + m0 + 1 / scale + i * size;
+            mCtx.fillText(lines[i], x0, y0);
+          }
           mCtx.restore();
         };
 
@@ -947,6 +1031,37 @@ function main() {
         ) {
           drawText(x1, y1, s1, s1, agency);
         }
+
+        if (
+          pass === 2 &&
+          group === 10 &&
+          olData.has(prefix) &&
+          closeUpScale > CLOSE_UP_TEXT_THRESHOLD
+        ) {
+          const data = olData.get(prefix);
+          if (!data || typeof data === "number") {
+            const text = data === null ? "Loading..." : data.toString();
+            drawText(
+              x1 + s1 / 2 - ((12 / scale) * 0.6 * text.length) / 2,
+              y1 + s1 / 2 - ((12 / scale) * 1.2) / 2,
+              s1,
+              s1,
+              text
+            );
+          } else {
+            drawMultilineText(
+              x1,
+              y1,
+              s1,
+              s1 - (12 / scale) * 1.2,
+              data.full_title || data.title || "???"
+            );
+
+            drawText(x1, y1 + s1 - 15 / scale, s1, 15, data.publish_date);
+          }
+        }
+
+        if (group >= 9) return;
 
         mCtx.save();
 
@@ -1051,28 +1166,38 @@ function main() {
     const statusUi = document.getElementById("status-ui")._x_dataStack[0];
 
     statusUi.agency = currAgency || "";
+
     if (currIsbn) {
-      let isbn = currIsbn;
-      let remainingLength = 10 - isbn.length;
+      let prefix = "";
+      let formatted = currIsbn;
       if (currAgencyPrefix) {
+        prefix = currAgencyPrefix;
+        formatted = prefix + "-" + currIsbn.slice(prefix.length);
         if (currPublisherPrefix) {
-          let rest = isbn.slice(currPublisherPrefix.length);
-          isbn = currPublisherPrefix;
-          isbn += "-" + rest;
+          prefix = currPublisherPrefix;
+          formatted =
+            currAgencyPrefix +
+            "-" +
+            currPublisherPrefix.slice(currAgencyPrefix.length) +
+            "-" +
+            currIsbn.slice(prefix.length);
         }
-        let rest = isbn.slice(currAgencyPrefix.length);
-        isbn = currAgencyPrefix;
-        isbn += "-" + rest;
       }
+
+      if (formatted.startsWith("0")) {
+        formatted = "978-" + formatted.slice(1);
+      } else if (formatted.startsWith("1")) {
+        formatted = "979-" + formatted.slice(1);
+      }
+
+      const remainingLength = 10 - currIsbn.length;
       if (remainingLength > 0) {
-        isbn += "·".repeat(remainingLength);
+        formatted += "·".repeat(remainingLength);
+      } else {
+        formatted += "-" + isbn13CheckDigitFromOffset(currIsbn);
       }
-      if (isbn.startsWith("0")) {
-        isbn = "978-" + isbn.slice(1);
-      } else if (isbn.startsWith("1")) {
-        isbn = "979-" + isbn.slice(1);
-      }
-      statusUi.isbn = isbn;
+
+      statusUi.isbn = formatted;
     } else {
       statusUi.isbn = "";
     }
@@ -1083,6 +1208,79 @@ function main() {
       }
     } else {
       statusUi.publisher = "";
+    }
+
+    if (
+      closeUpScale > CLOSE_UP_TEXT_THRESHOLD &&
+      store.params.autoloadMetadata
+    ) {
+      const ctx = readCanvas.getContext("2d", {
+        alpha: false,
+        willReadFrequently: true,
+      });
+      ctx.imageSmoothingEnabled = false;
+
+      let [x0, y0] = screenToContent([0, 0], store.viewport);
+
+      let [x1, y1] = screenToContent(
+        [store.viewport.width, store.viewport.height],
+        store.viewport
+      );
+
+      x0 = Math.ceil(x0);
+      y0 = Math.ceil(y0);
+      x1 = Math.floor(x1);
+      y1 = Math.floor(y1);
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+
+      if (dx > 0 && dy > 0) {
+        const [sx0, sy0] = contentToScreen([x0, y0], store.viewport);
+
+        const [sx1, sy1] = contentToScreen([x1, y1], store.viewport);
+
+        ctx.drawImage(
+          tilesCanvas3,
+          sx0 * store.viewport.pixelRatio,
+          sy0 * store.viewport.pixelRatio,
+          (sx1 - sx0) * store.viewport.pixelRatio,
+          (sy1 - sy0) * store.viewport.pixelRatio,
+          0,
+          0,
+          dx,
+          dy
+        );
+
+        const pixels = ctx.getImageData(0, 0, dx, dy).data;
+
+        for (let i = 0; i < pixels.length; i += 4) {
+          if (pixels[i] !== 0 || pixels[i + 1] !== 0 || pixels[i + 2] !== 0) {
+            const x = (i / 4) % dx;
+            const y = ~~(i / 4 / dx);
+
+            loadISBNInfo(getISBNFromPos(x + x0, y + y0, 10));
+          }
+        }
+      }
+    }
+
+    if (closeUpScale > 0 && currIsbn?.length === 10) {
+      mainCanvas.style.cursor = "pointer";
+    } else {
+      mainCanvas.style.cursor = "";
+    }
+
+    // mCtx.drawImage(tilesCanvas3, 0, 0);
+
+    // document.getElementById("layers-ui")._x_dataStack[0].loadButtonEnabled =
+    //   shouldShowLoadButton;
+
+    if (clicked) {
+      if (currIsbn?.length === 10) {
+        const isbn = isbn13CheckDigitFromOffset(currIsbn, true);
+        console.log("handle this", isbn);
+        window.open(`https://annas-archive.org/search?q="isbn13:${isbn}"`);
+      }
     }
   };
 }
