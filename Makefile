@@ -6,8 +6,9 @@ INPUT_DATA := data
 WEB_DIR := web
 
 # Input files
-# TODO: document how to get these
+# get this from here, "Range Message (xml) Generate": https://www.isbn-international.org/range_file_generation
 RANGE_MSG := $(INPUT_DATA)/RangeMessage.xml
+# get these from AA
 ISBNGRP := $(INPUT_DATA)/annas_archive_meta__aacid__isbngrp_records__20240920T194930Z--20240920T194930Z.jsonl.seekable.zst
 ISBN_CODES := $(INPUT_DATA)/aa_isbn13_codes_20250111T024210Z.benc.zst
 WORLDCAT := $(INPUT_DATA)/annas_archive_meta__aacid__worldcat__20241230T203056Z--20241230T203056Z.jsonl.seekable.zst
